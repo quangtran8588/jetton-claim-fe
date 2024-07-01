@@ -12,7 +12,6 @@ import {
 } from "@ton/core";
 
 export type JettonMinterV2Config = {
-  totalRequested: bigint;
   totalSupply: bigint;
   admin: Address;
   fixedAmount: bigint;
@@ -29,7 +28,6 @@ export type MintTokenV2Req = {
 
 export function jettonMinterV2ConfigToCell(config: JettonMinterV2Config): Cell {
   return beginCell()
-    .storeCoins(config.totalRequested)
     .storeCoins(config.totalSupply)
     .storeAddress(config.admin)
     .storeCoins(config.fixedAmount)
@@ -64,6 +62,24 @@ export class JettonMinterV2 implements Contract {
       value,
       sendMode: SendMode.PAY_GAS_SEPARATELY,
       body: beginCell().endCell(),
+    });
+  }
+
+  async sendChangeAdmin(
+    provider: ContractProvider,
+    sender: Sender,
+    value: bigint,
+    admin: Address
+  ) {
+    const msgBody = beginCell()
+      .storeUint(3, 32) //  op = 3 for changing Admin
+      .storeUint(0, 64) //  query_id  (not use)
+      .storeAddress(admin)
+      .endCell();
+    await provider.internal(sender, {
+      value: value,
+      sendMode: SendMode.PAY_GAS_SEPARATELY,
+      body: msgBody,
     });
   }
 
@@ -127,7 +143,6 @@ export class JettonMinterV2 implements Contract {
     const result: TupleReader = (await provider.get("get_full_jetton_data", []))
       .stack;
 
-    const totalRequested = result.readBigNumber();
     const totalSupply = result.readBigNumber();
     result.readBigNumber(); //  mintable value
     const admin = result.readAddress();
@@ -138,7 +153,6 @@ export class JettonMinterV2 implements Contract {
 
     return {
       admin: admin,
-      totalRequested: totalRequested,
       totalSupply: totalSupply,
       fixedAmount: fixedAmount,
       cooldown: cooldown,

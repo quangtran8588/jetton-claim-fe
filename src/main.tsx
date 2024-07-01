@@ -6,8 +6,7 @@ import { TonConnectUIProvider } from "@tonconnect/ui-react";
 import App from "./App.tsx";
 import theme from "./utils/theme.ts";
 
-const manifestURL =
-  "https://raw.githubusercontent.com/ton-community/tutorials/main/03-client/test/public/tonconnect-manifest.json";
+const manifestURL = import.meta.env.VITE_MANIFEST_URL as string;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
