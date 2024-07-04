@@ -6,24 +6,26 @@ import { isEqual } from "lodash";
 import { JettonWalletV2 } from "../contracts/JettonWallet-v2";
 import { useAsyncInitialize } from "./useAsyncInitialize";
 import { useTonClient } from "./useTonClient";
+import { useJettonMinter } from "./useJettonMinter";
+import { useTonConnect } from "./useTonConnect";
 
 type Data = {
   owner: Address;
   balance: bigint;
 };
 
-interface Props {
-  jettonWalletAddr: Address;
-}
-
-export function useJettonWallet({ jettonWalletAddr }: Props) {
+export function useJettonWallet() {
   const client = useTonClient();
-  // const sender = useTonConnect();
-  const [data, setData] = useState<Data | null>(null);
+  const { getWalletAddress } = useJettonMinter();
+  const { account } = useTonConnect();
+  const [balance, setBalance] = useState<bigint>(BigInt(0));
 
   const wallet = useAsyncInitialize(async () => {
-    if (!client || !jettonWalletAddr) return;
+    if (!client || !account) return;
 
+    const jettonWalletAddr: Address = (await getWalletAddress(
+      Address.parse(account.address as string)
+    )) as Address;
     const wallet: OpenedContract<JettonWalletV2> = client.open(
       JettonWalletV2.createFromAddress(jettonWalletAddr)
     ) as OpenedContract<JettonWalletV2>;
@@ -37,11 +39,21 @@ export function useJettonWallet({ jettonWalletAddr }: Props) {
     async function getWalletData() {
       if (!wallet) return;
 
-      const query: Data = await wallet.getWalletData();
+      let query: Data = {
+        owner: Address.parse(account?.address as string),
+        balance: BigInt(0),
+      };
 
-      if (!isEqual(query, data)) {
-        setData(query);
+      try {
+        query = await wallet.getWalletData();
+      } catch (e) {
+        // There's a case that Jetton Wallet not yet initialized
+        // thus, getWalletData() will throw error
+        // In such case, leave the default value which is
+        // owner = connected_account and balance = 0
       }
+
+      if (!isEqual(query.balance, balance)) setBalance(query.balance);
     }
 
     if (wallet) {
@@ -52,9 +64,9 @@ export function useJettonWallet({ jettonWalletAddr }: Props) {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [wallet, data]);
+  }, [wallet, balance, account?.address]);
 
   return {
-    data: data,
+    balance: balance,
   };
 }

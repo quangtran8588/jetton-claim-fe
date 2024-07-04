@@ -14,9 +14,10 @@ import { isEqual } from "lodash";
 
 import Logo from "./Logo";
 import SettingModal from "./SettingModal";
+import { MintTokenV2Req } from "../contracts/JettonMinter-v2";
 import { useTonConnect } from "../hooks/useTonConnect";
 import { useJettonMinter } from "../hooks/useJettonMinter";
-import { MintTokenV2Req } from "../contracts/JettonMinter-v2";
+import { useJettonWallet } from "../hooks/useJettonWallet";
 
 function selfClaimReq(
   addr: Address,
@@ -50,8 +51,9 @@ function selfClaimReq(
 }
 
 export default function Claim() {
-  const { data, sendMintToken } = useJettonMinter();
   const { connected, account } = useTonConnect();
+  const { data, sendMintToken } = useJettonMinter();
+  const { balance } = useJettonWallet();
 
   let mintReq: MintTokenV2Req;
   if (account && data) {
@@ -108,8 +110,8 @@ export default function Claim() {
 
         <Box
           w={{ base: "100%", sm: "70%", md: "50%", xl: "40%" }}
-          h={{ base: "180px" }}
-          mb={6}
+          h={{ base: "210px" }}
+          mb={"20px"}
         >
           <Grid
             w="100%"
@@ -201,7 +203,7 @@ export default function Claim() {
 
             <GridItem
               rowSpan={1}
-              colSpan={2}
+              colSpan={1}
               bgGradient="linear(to-l, gray.900, green.900, black)"
               border="2px solid"
               borderColor="green.900"
@@ -214,6 +216,25 @@ export default function Claim() {
                 </Text>
                 <Text fontSize={{ base: "sm" }}>{`${fromNano(
                   data ? data.totalSupply : 0
+                )}`}</Text>
+              </VStack>
+            </GridItem>
+
+            <GridItem
+              rowSpan={1}
+              colSpan={1}
+              bgGradient="linear(to-l, gray.900, green.900, black)"
+              border="2px solid"
+              borderColor="green.900"
+              borderStyle="double"
+              borderRadius="10px"
+            >
+              <VStack display="flex" justifyContent="space-around">
+                <Text fontSize={{ base: "xs" }} color="#00FFFF">
+                  Your Balance
+                </Text>
+                <Text fontSize={{ base: "sm" }}>{`${fromNano(
+                  balance ? balance : 0
                 )}`}</Text>
               </VStack>
             </GridItem>

@@ -41,9 +41,7 @@ export function useJettonMinter() {
 
       const query: Data = await minter.getJettonMinterFullData();
 
-      if (!isEqual(query, data)) {
-        setData(query);
-      }
+      if (!isEqual(query, data)) setData(query);
     }
 
     if (minter) {
