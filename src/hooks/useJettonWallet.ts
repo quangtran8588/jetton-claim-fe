@@ -39,6 +39,7 @@ export function useJettonWallet() {
     async function getWalletData() {
       if (!wallet) return;
 
+      console.log(wallet.address.toString());
       let query: Data = {
         owner: Address.parse(account?.address as string),
         balance: BigInt(0),
@@ -46,14 +47,13 @@ export function useJettonWallet() {
 
       try {
         query = await wallet.getWalletData();
+        if (!isEqual(query.balance, balance)) setBalance(query.balance);
       } catch (e) {
         // There's a case that Jetton Wallet not yet initialized
         // thus, getWalletData() will throw error
         // In such case, leave the default value which is
         // owner = connected_account and balance = 0
       }
-
-      if (!isEqual(query.balance, balance)) setBalance(query.balance);
     }
 
     if (wallet) {
