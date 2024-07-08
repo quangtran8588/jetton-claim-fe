@@ -1,26 +1,24 @@
-import {
-  Account,
-  ConnectedWallet,
-  useTonConnectUI,
-} from "@tonconnect/ui-react";
-import { useEffect, useState } from "react";
+import { ConnectedWallet, useTonConnectUI } from "@tonconnect/ui-react";
+import { useEffect } from "react";
 import { Sender, SenderArguments } from "@ton/core";
+
+import { useAppContext } from "./uesAppContext";
 
 export function useTonConnect(): {
   sender: Sender;
-  account: Account | null;
-  connected: boolean;
 } {
   const [tonConnectUI] = useTonConnectUI();
-  const [wallet, setWallet] = useState<ConnectedWallet | null>(null);
+  const { setWallet, setJettonWallet, setJettonWalletData } = useAppContext();
 
-  useEffect(
-    () =>
-      tonConnectUI.onStatusChange((wallet: ConnectedWallet | null) =>
-        setWallet(wallet)
-      ),
-    [tonConnectUI]
-  );
+  useEffect(() => {
+    tonConnectUI.onStatusChange((connectedWallet: ConnectedWallet | null) => {
+      setWallet(connectedWallet);
+      if (!connectedWallet) {
+        setJettonWallet(null);
+        setJettonWalletData(null);
+      }
+    });
+  }, [setJettonWallet, setJettonWalletData, setWallet, tonConnectUI]);
 
   return {
     sender: {
@@ -37,7 +35,5 @@ export function useTonConnect(): {
         });
       },
     },
-    account: wallet ? wallet.account : null,
-    connected: wallet ? true : false,
   };
 }

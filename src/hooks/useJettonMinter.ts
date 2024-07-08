@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect } from "react";
 import { Address, OpenedContract, toNano } from "@ton/core";
-
-import { JettonMinterV2, MintTokenV2Req } from "../contracts/JettonMinter-v2";
-import { useAsyncInitialize } from "./useAsyncInitialize";
-import { useTonClient } from "./useTonClient";
-import { useTonConnect } from "./useTonConnect";
-import { useEffect, useState } from "react";
 import { isEqual } from "lodash";
 
-type Data = {
+import { JettonMinterV2, MintTokenV2Req } from "../contracts/JettonMinter-v2";
+import { useTonClient } from "./useTonClient";
+import { useTonConnect } from "./useTonConnect";
+import { useAppContext } from "./uesAppContext";
+
+export type JettonMinterData = {
   admin: Address;
   totalSupply: bigint;
   fixedAmount: bigint;
@@ -18,10 +18,15 @@ type Data = {
 export function useJettonMinter() {
   const client = useTonClient();
   const sender = useTonConnect();
-  const [data, setData] = useState<Data | null>(null);
+  const {
+    jettonMinter,
+    setJettonMinter,
+    jettonMinterData,
+    setJettonMinterData,
+  } = useAppContext();
 
-  const minter = useAsyncInitialize(async () => {
-    if (!client) return;
+  useEffect(() => {
+    if (!client || jettonMinter) return;
 
     const minterAddress: Address = Address.parse(
       import.meta.env.VITE_TON_CLAIMABLE_TOKEN_ADDR
@@ -30,46 +35,48 @@ export function useJettonMinter() {
       JettonMinterV2.createFromAddress(minterAddress)
     ) as OpenedContract<JettonMinterV2>;
 
-    return minter;
-  }, [client]);
+    setJettonMinter(minter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, jettonMinter]);
 
   useEffect(() => {
-    let intervalId: any;
-
     async function getValue() {
-      if (!minter) return;
+      if (!jettonMinter) return;
 
-      const query: Data = await minter.getJettonMinterFullData();
+      const query: JettonMinterData =
+        await jettonMinter.getJettonMinterFullData();
 
-      if (!isEqual(query, data)) setData(query);
+      if (!isEqual(query, jettonMinterData)) setJettonMinterData(query);
     }
 
-    if (minter) {
-      getValue();
-      intervalId = setInterval(getValue, 10000);
-    }
+    getValue();
+    const intervalId = setInterval(getValue, 10000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [minter, data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jettonMinter]);
 
   return {
-    data: data,
     sendMintToken: (req: MintTokenV2Req) => {
-      return minter?.sendMintToken(sender.sender, toNano(0.08), req);
+      return jettonMinter?.sendMintToken(sender.sender, toNano(0.08), req);
     },
     sendChangeAdmin: (admin: Address) => {
-      return minter?.sendChangeAdmin(sender.sender, toNano(0.01), admin);
+      return jettonMinter?.sendChangeAdmin(sender.sender, toNano(0.01), admin);
     },
     sendSetFixedAmount: (amount: bigint) => {
-      return minter?.sendSetFixedAmount(sender.sender, toNano(0.01), amount);
+      return jettonMinter?.sendSetFixedAmount(
+        sender.sender,
+        toNano(0.01),
+        amount
+      );
     },
     sendSetCooldown: (cdTime: bigint) => {
-      return minter?.sendSetCooldown(sender.sender, toNano(0.01), cdTime);
+      return jettonMinter?.sendSetCooldown(sender.sender, toNano(0.01), cdTime);
     },
     getWalletAddress: (owner: Address) => {
-      return minter?.getJettonWalletAddress(owner);
+      return jettonMinter?.getJettonWalletAddress(owner);
     },
   };
 }

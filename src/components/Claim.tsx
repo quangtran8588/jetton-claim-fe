@@ -12,12 +12,12 @@ import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { Address, beginCell, fromNano, toNano } from "@ton/core";
 import { isEqual } from "lodash";
 
-import Logo from "./Logo";
-import SettingModal from "./SettingModal";
 import { MintTokenV2Req } from "../contracts/JettonMinter-v2";
-import { useTonConnect } from "../hooks/useTonConnect";
 import { useJettonMinter } from "../hooks/useJettonMinter";
 import { useJettonWallet } from "../hooks/useJettonWallet";
+import SettingModal from "./SettingModal";
+import { useAppContext } from "../hooks/uesAppContext";
+import Logo from "./Logo";
 
 function selfClaimReq(
   addr: Address,
@@ -51,20 +51,9 @@ function selfClaimReq(
 }
 
 export default function Claim() {
-  const { connected, account } = useTonConnect();
-  const { data, sendMintToken } = useJettonMinter();
-  const { balance } = useJettonWallet();
-
-  let mintReq: MintTokenV2Req;
-  if (account && data) {
-    const addr = Address.parse(account.address as string);
-    mintReq = selfClaimReq(
-      addr,
-      data.fixedAmount,
-      data.cooldown,
-      `Mint ${data.fixedAmount} tokens`
-    );
-  }
+  const { wallet, jettonMinterData, jettonWalletData } = useAppContext();
+  const { sendMintToken } = useJettonMinter();
+  useJettonWallet();
 
   let contract = import.meta.env.VITE_TON_CLAIMABLE_TOKEN_ADDR as string;
   const explorer = import.meta.env.VITE_TON_EXPLORER as string;
@@ -73,15 +62,28 @@ export default function Claim() {
 
   let admin: string = "";
   let adminLink: string = "";
-  if (data) {
-    admin = data.admin.toString();
+  let isAdmin: boolean = false;
+
+  let mintReq: MintTokenV2Req;
+  if (jettonMinterData) {
+    admin = jettonMinterData.admin.toString();
     adminLink = explorer + admin;
     admin = admin.slice(0, 20) + "..." + admin.slice(-5);
   }
-  const isAdmin = isEqual(
-    data?.admin.toRawString(),
-    account?.address as string
-  );
+  if (wallet && jettonMinterData) {
+    const addr = Address.parse(wallet.account.address as string);
+    mintReq = selfClaimReq(
+      addr,
+      jettonMinterData.fixedAmount,
+      jettonMinterData.cooldown,
+      `Mint ${jettonMinterData.fixedAmount} tokens`
+    );
+
+    isAdmin = isEqual(
+      jettonMinterData.admin.toRawString(),
+      wallet.account.address as string
+    );
+  }
 
   return (
     <Box w="100dvw" h="100dvh" display="flex" justifyContent="center">
@@ -171,7 +173,7 @@ export default function Claim() {
                 </HStack>
 
                 <Text fontSize={{ base: "sm" }}>{`${fromNano(
-                  data ? data.fixedAmount : 0
+                  jettonMinterData ? jettonMinterData.fixedAmount : 0
                 )}`}</Text>
               </VStack>
             </GridItem>
@@ -196,7 +198,7 @@ export default function Claim() {
                   />
                 </HStack>
                 <Text fontSize={{ base: "sm" }}>
-                  {`${data ? data.cooldown : 0}`}s
+                  {`${jettonMinterData ? jettonMinterData.cooldown : 0}`}s
                 </Text>
               </VStack>
             </GridItem>
@@ -215,7 +217,7 @@ export default function Claim() {
                   Total Supply
                 </Text>
                 <Text fontSize={{ base: "sm" }}>{`${fromNano(
-                  data ? data.totalSupply : 0
+                  jettonMinterData ? jettonMinterData.totalSupply : 0
                 )}`}</Text>
               </VStack>
             </GridItem>
@@ -234,7 +236,7 @@ export default function Claim() {
                   Your Balance
                 </Text>
                 <Text fontSize={{ base: "sm" }}>{`${fromNano(
-                  balance ? balance : 0
+                  wallet && jettonWalletData ? jettonWalletData.balance : 0
                 )}`}</Text>
               </VStack>
             </GridItem>
@@ -244,7 +246,7 @@ export default function Claim() {
         <Button
           size={{ base: "sm" }}
           onClick={() => sendMintToken(mintReq)}
-          isDisabled={connected ? false : true}
+          isDisabled={wallet ? false : true}
         >
           Claim
         </Button>

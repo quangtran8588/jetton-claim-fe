@@ -1,72 +1,86 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from "react";
-import { Address, OpenedContract } from "@ton/core";
+import { useEffect } from "react";
+import { Address, OpenedContract, toNano } from "@ton/core";
 import { isEqual } from "lodash";
 
-import { JettonWalletV2 } from "../contracts/JettonWallet-v2";
-import { useAsyncInitialize } from "./useAsyncInitialize";
+import {
+  JettonWalletV2,
+  JettonWalletV2Transfer,
+} from "../contracts/JettonWallet-v2";
 import { useTonClient } from "./useTonClient";
 import { useJettonMinter } from "./useJettonMinter";
+import { useAppContext } from "./uesAppContext";
 import { useTonConnect } from "./useTonConnect";
 
-type Data = {
+export type JettonWalletData = {
   owner: Address;
   balance: bigint;
 };
 
 export function useJettonWallet() {
   const client = useTonClient();
+  const sender = useTonConnect();
+  const {
+    wallet,
+    jettonWallet,
+    setJettonWallet,
+    jettonWalletData,
+    setJettonWalletData,
+  } = useAppContext();
   const { getWalletAddress } = useJettonMinter();
-  const { account } = useTonConnect();
-  const [balance, setBalance] = useState<bigint>(BigInt(0));
-
-  const wallet = useAsyncInitialize(async () => {
-    if (!client || !account) return;
-
-    const jettonWalletAddr: Address = (await getWalletAddress(
-      Address.parse(account.address as string)
-    )) as Address;
-    const wallet: OpenedContract<JettonWalletV2> = client.open(
-      JettonWalletV2.createFromAddress(jettonWalletAddr)
-    ) as OpenedContract<JettonWalletV2>;
-
-    return wallet;
-  }, [client]);
 
   useEffect(() => {
-    let intervalId: any;
+    if (!client || !wallet) return;
 
-    async function getWalletData() {
-      if (!wallet) return;
+    async function setJettonWalletAddress() {
+      const jwAddress: Address = (await getWalletAddress(
+        Address.parse(wallet?.account.address as string)
+      )) as Address;
 
-      console.log(wallet.address.toString());
-      let query: Data = {
-        owner: Address.parse(account?.address as string),
+      const jw: OpenedContract<JettonWalletV2> = client?.open(
+        JettonWalletV2.createFromAddress(jwAddress)
+      ) as OpenedContract<JettonWalletV2>;
+      if (!isEqual(jettonWallet, jw)) setJettonWallet(jw);
+    }
+
+    setJettonWalletAddress();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, wallet]);
+
+  useEffect(() => {
+    if (!jettonWallet) return;
+
+    async function getJettonWalletData() {
+      if (!jettonWallet) return;
+
+      let query: JettonWalletData = {
+        owner: Address.parse(wallet?.account.address as string),
         balance: BigInt(0),
       };
 
       try {
-        query = await wallet.getWalletData();
-        if (!isEqual(query.balance, balance)) setBalance(query.balance);
+        query = await jettonWallet.getWalletData();
       } catch (e) {
         // There's a case that Jetton Wallet not yet initialized
         // thus, getWalletData() will throw error
         // In such case, leave the default value which is
         // owner = connected_account and balance = 0
       }
+      if (!isEqual(query, jettonWalletData)) setJettonWalletData(query);
     }
 
-    if (wallet) {
-      getWalletData();
-      intervalId = setInterval(getWalletData, 10000);
-    }
+    getJettonWalletData();
+    const intervalId = setInterval(getJettonWalletData, 10000);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [wallet, balance, account?.address]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jettonWallet]);
 
   return {
-    balance: balance,
+    sendTransfer: (value: string, req: JettonWalletV2Transfer) => {
+      return jettonWallet?.sendTransfer(sender.sender, toNano(value), req);
+    },
   };
 }
